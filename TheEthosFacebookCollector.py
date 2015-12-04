@@ -1888,7 +1888,8 @@ def main(argv):
     if len(args) > 1:
         menu_interface(args[1])
     else:
-        menu_interface(str(args[0]).replace(str(os.path.basename(__file__)),"")[:-1])  
+        path_ = str(os.path.abspath(os.path.dirname(__file__)))
+        menu_interface(path_)  
 
 if __name__ == "__main__":
     main(sys.argv)
