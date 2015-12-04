@@ -835,7 +835,7 @@ def make_CSV_files(db,db_path):
             print (k + " - post_info joined with "+ v)   
         
         answer = get_inp(">>> ") 
-        while check_answer(answer,*temp_table_list.keys(),"13","14","done","0") == False:
+        while check_answer(answer,"13","14","done","0",*temp_table_list.keys()) == False:
             answer = get_inp(">>> ")
         
         if answer == "0":
