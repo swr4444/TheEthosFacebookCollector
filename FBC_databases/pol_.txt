@@ -1,0 +1,6 @@
+/Users/Jakob/Desktop/EthosTESTING/TheEthosFacebookCollector 0.9.2 Beta/Projects/politics
+/Users/Jakob/Desktop/EthosTESTING/TheEthosFacebookCollector 0.9.2 Beta/Page Lists/politics.txt
+458030681063798
+df5d23275894ddc33709f77f9bb459ca
+False
+True

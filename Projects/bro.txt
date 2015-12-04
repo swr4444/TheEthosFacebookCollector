@@ -1,0 +1,5 @@
+App_id=458030681063798
+App_secret=df5d23275894ddc33709f77f9bb459ca
+Path_to_page_list=/Users/Jakob/Documents/workspace/Facebook V3/V_093/Page Lists/bro2.txt
+Scrape_only_pages_liked_by_page=True
+Make_with_count_tables=False
