@@ -952,7 +952,7 @@ def make_gephi_files(db,db_path):
         print ("9. Make network from date range")
         
         answer = get_inp(">>> ") 
-        while check_answer(answer,*network_choice.keys(),"0","9") == False:
+        while check_answer(answer,"0","9",*network_choice.keys()) == False:
             answer = get_inp(">>> ")
         
         if answer == "0":
