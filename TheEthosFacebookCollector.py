@@ -7,7 +7,6 @@ import time
 import codecs
 import datetime
 from os import listdir
-from _collections import OrderedDict
 if sys.version_info[0] < 3:
     print ("You need Python 3")
     sys.exit()
