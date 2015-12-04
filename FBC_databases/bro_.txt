@@ -1,6 +1,0 @@
-/Users/Jakob/Documents/workspace/Facebook V3/V_093/Projects/bro
-/Users/Jakob/Documents/workspace/Facebook V3/V_093/Page Lists/bro.txt
-458030681063798
-df5d23275894ddc33709f77f9bb459ca
-True
-False
