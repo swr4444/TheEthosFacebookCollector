@@ -1034,7 +1034,10 @@ def find_page_like_network(args):
             if not str(like['id']) in unique_checker:
                 page_likes_data.append(str(like['id']))
                 unique_checker[str(like['id'])]=True
-                print (like['name'])
+                try:
+                    print (like['name'])
+                except:
+                    print ("Name not printable")
         
         return page_likes_data
 

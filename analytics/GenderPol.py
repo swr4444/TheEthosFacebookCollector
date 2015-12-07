@@ -26,7 +26,6 @@ import numpy as np
 class FacebookApp:
 
     def __init__(self, master, path_, conn, db):
-        print ("start")
         self.path_ = path_
         self.connection = conn
         self.cur = self.connection.cursor()
@@ -42,6 +41,12 @@ class FacebookApp:
         except:
             self.interactive_plot_list = []
             print ("No Load File")
+            
+        try:
+            self.cur.execute('select * from {0}likes_info limit 1'.format(self.title))
+        except:
+            print ("You have no post data in your database")
+            sys.exit()
        
         self.frame_header = ttk.Frame(master)
         self.frame_content = ttk.Frame(master)
@@ -313,7 +318,6 @@ class FacebookApp:
         self.canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
         
         for a in afl:
-            print ("goat")
             f.canvas.mpl_connect('button_press_event',a)
         self.print_data(f)
         self.canvas.show()

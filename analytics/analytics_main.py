@@ -303,6 +303,12 @@ def analytics_pol_menu(path_,conn,db):
     if not os.path.exists(path_+analytics+"/batch"):
         os.makedirs(path_+analytics+"/batch")
     if not os.path.isfile(path_+analytics+"/batch/pol_by_id.p"):
+        try:
+            cur = conn.cursor()
+            cur.execute("select * from {0}likes_info limit 1".format(db))
+        except:
+            print ("You have no post data in your database")
+            sys.exit()
         print ("A batch file is nescesary in order to make political analysis. Do you want to make it now? y/n")
         answer = get_inp(">>> ")
         while check_answer(answer,"y","n") == False:
