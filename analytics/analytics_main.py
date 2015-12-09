@@ -186,6 +186,7 @@ def batch_file_menu(path_, conn, db):
 
 
 def analytics_start_menu(conn, current_db, path_):
+    check_for_extra_data(path_, conn, current_db)
     clear_screen()
     print ("What do you want to do?")
     print ("\n")
@@ -243,9 +244,9 @@ def analytics_start_menu(conn, current_db, path_):
 def check_for_extra_data(path_,conn,db):
     cur = conn.cursor()
     cur.execute("CREATE  TABLE IF NOT EXISTS `political_entities` (`name` VARCHAR(200),`web_name` VARCHAR(200),`party` VARCHAR(3),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
-    cur.execute("CREATE  TABLE IF NOT EXISTS `common_danish_words` (`word` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
-    cur.execute("CREATE  TABLE IF NOT EXISTS `common_english_words` (`word` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
-    cur.execute("CREATE  TABLE IF NOT EXISTS `extrawords` (`word` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
+    cur.execute("CREATE  TABLE IF NOT EXISTS `common_danish_words` (`word` text,`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
+    cur.execute("CREATE  TABLE IF NOT EXISTS `common_english_words` (`word` text,`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
+    cur.execute("CREATE  TABLE IF NOT EXISTS `extrawords` (`word` text,`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
     cur.execute("CREATE  TABLE IF NOT EXISTS `male_names` (`name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
     cur.execute("CREATE  TABLE IF NOT EXISTS `female_names` (`name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
     for file_ in listdir(path_+analytics+"/Extra_tables"):
@@ -253,14 +254,14 @@ def check_for_extra_data(path_,conn,db):
             cur.execute("SELECT * FROM {0};".format(str(file_).replace(".csv","")))
             if not cur.fetchall():
                 print ("Inserting extra data...")
-                tempscript = codecs.open(path_+analytics+"/Extra_tables/"+file_,"r","latin-1")
+                tempscript = codecs.open(path_+analytics+"/Extra_tables/"+file_,"r","utf-8")
                 reader = csv.reader(tempscript)
                 for row in reader:
                     try:
                         if str(file_).replace(".csv","") == "political_entities": cur.execute("insert into political_entities (name,web_name,party) VALUES (?,?,?)",[row[0],row[1],row[2]])
-                        if str(file_).replace(".csv","") == "common_danish_words": cur.execute("insert into common_danish_words (word) VALUES (?)",[row[0]])
-                        if str(file_).replace(".csv","") == "common_english_words": cur.execute("insert into common_english_words (word) VALUES (?)",[row[0]])
-                        if str(file_).replace(".csv","") == "extrawords": cur.execute("insert into extrawords (word) VALUES (?)",[row[0]])
+                        if str(file_).replace(".csv","") == "common_danish_words": cur.execute("insert into common_danish_words (word) VALUES (?)",[str(row[0])])
+                        if str(file_).replace(".csv","") == "common_english_words": cur.execute("insert into common_english_words (word) VALUES (?)",[str(row[0])])
+                        if str(file_).replace(".csv","") == "extrawords": cur.execute("insert into extrawords (word) VALUES (?)",[str(row[0])])
                         if str(file_).replace(".csv","") == "male_names": cur.execute("insert into male_names (name) VALUES (?)",[row[0]])
                         if str(file_).replace(".csv","") == "female_names": cur.execute("insert into female_names (name) VALUES (?)",[row[0]])
                     except:
@@ -299,7 +300,6 @@ def analytics_menu(path_):
 
 def analytics_pol_menu(path_,conn,db):
     clear_screen()
-    check_for_extra_data(path_, conn, db)
     if not os.path.exists(path_+analytics+"/batch"):
         os.makedirs(path_+analytics+"/batch")
     if not os.path.isfile(path_+analytics+"/batch/pol_by_id.p"):

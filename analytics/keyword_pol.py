@@ -669,19 +669,20 @@ class WordFrequency:
             if extra == True:
                 cur.execute("select word from extrawords")
                 for row in cur.fetchall():
-                    x_words[row[0].lower().rstrip()]=True
+                    x_words[row[0].lower()]=True
+                    print (row[0])
             
             com_words = {}
             cur.execute("select word from common_danish_words")
             for row in cur.fetchall():
-                com_words[row[0].lower().rstrip()]=True
+                com_words[row[0].lower()]=True
             for w in except_words:
                 del com_words[w]
                 
             eng_words = {}
             cur.execute("select word from common_english_words")
             for row in cur.fetchall():
-                eng_words[row[0].lower().rstrip()]=True
+                eng_words[row[0].lower()]=True
             
             return [eng_words,com_words,x_words]
 
@@ -696,7 +697,7 @@ class WordFrequency:
                             clean_worddict[k]=v
             else:
                 for k,v in worddict.items():
-                    if k not in word_filters[0] and len(k) > 1 and k not in word_filters[1] and k not in word_filters[4] and k not in extralist:
+                    if k not in word_filters[0] and len(k) > 1 and k not in word_filters[1] and k not in word_filters[2] and k not in extralist:
                         if v > limit:
                             clean_worddict[k]=v
                             
@@ -742,23 +743,24 @@ class WordFrequency:
             for d in self._last_by_ids:
                 for kk,vv in d.items():
                     if word in vv:
-                        if assign_wing(self._by_id_already_parsed[kk],'r') > 0.75:
-                            for w,s in vv.items():
-                                if not w in self._last_word_list[0]:
-                                    r_co[w]+=s
-                        elif assign_wing(self._by_id_already_parsed[kk],'b') > 0.75:
-                            for w,s in vv.items():
-                                if not w in self._last_word_list[0]:
-                                    b_co[w]+=s
-                        else:
-                            pass
+                        if kk in self._by_id_already_parsed:
+                            if assign_wing(self._by_id_already_parsed[kk],'r') > 0.75:
+                                for w,s in vv.items():
+                                    if not w in self._last_word_list[0]:
+                                        r_co[w]+=s
+                            elif assign_wing(self._by_id_already_parsed[kk],'b') > 0.75:
+                                for w,s in vv.items():
+                                    if not w in self._last_word_list[0]:
+                                        b_co[w]+=s
+                            else:
+                                pass
                     else:
                         pass
-            word_filters2 = create_word_filters(True, "", False, ['ikke'])
+            word_filters2 = create_word_filters(True, "", False, ['ikke'],conn)
             r_co_c = clean_words(r_co, 0, True, word_filters2, [])
             b_co_c = clean_words(b_co, 0, True, word_filters2, [])
                     
-            return [sorted(r_co_c.items()),sorted(b_co_c.items()),r_co,b_co]
+            return [sorted(r_co_c.items(), key=lambda x:(x[1]) ,reverse=True),sorted(b_co_c.items(), key=lambda x:(x[1]) ,reverse=True),r_co,b_co]
         
         aloop = False
         r_co = FreqDist()
@@ -766,21 +768,25 @@ class WordFrequency:
         
         for d in self._last_by_ids:
             for kk,vv in d.items():
-                if assign_wing(self._by_id_already_parsed[kk],'r') > 0.75:
-                    for w,s in vv.items():
-                        r_co[w]+=s
-                elif assign_wing(self._by_id_already_parsed[kk],'b') > 0.75:
-                    for w,s in vv.items():
-                        b_co[w]+=s
-                else:
+                try:
+                    if assign_wing(self._by_id_already_parsed[kk],'r') > 0.75:
+                        for w,s in vv.items():
+                            r_co[w]+=s
+                    elif assign_wing(self._by_id_already_parsed[kk],'b') > 0.75:
+                        for w,s in vv.items():
+                            b_co[w]+=s
+                    else:
+                        pass
+                except:
                     pass
-                
-        word_filters = create_word_filters(True, "", False, [])
+        print (r_co)
+        word_filters = create_word_filters(True, "", False, [], conn)
         r_co_c = clean_words(r_co, 0, True, word_filters, [])
         b_co_c = clean_words(b_co, 0, True, word_filters, [])
         
-        r_co_c = sorted(r_co_c.items())
-        b_co_c = sorted(b_co_c.items())
+        r_co_c = sorted(r_co_c.items(),key=lambda x:(x[1]) ,reverse=True)
+        b_co_c = sorted(b_co_c.items(),key=lambda x:(x[1]) ,reverse=True)
+        
         
         def print_result(r_co_c,b_co_c,r_co,b_co):
             
