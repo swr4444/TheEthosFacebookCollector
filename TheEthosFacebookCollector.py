@@ -357,7 +357,7 @@ def create_post_url(graph_url,firstdate,lastdate, APP_ID, APP_SECRET):
     else:
         stop = str(lastdate)[:-9]
     
-    post_args = "/posts/?fields=id,from.fields(id,name),shares,type,picture,object_id,created_time,caption,description,name,link,message&limit=25&since=" + stop + "&until=" + start + "&key=value&access_token=" + APP_ID + "|" + APP_SECRET
+    post_args = "/feed/?fields=id,from.fields(id,name),shares,type,picture,object_id,created_time,caption,description,name,link,message&limit=25&since=" + stop + "&until=" + start + "&key=value&access_token=" + APP_ID + "|" + APP_SECRET
     post_url = graph_url + post_args
  
     return post_url
@@ -1382,8 +1382,19 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
         #insert the data we pulled into db
         cursor.execute("select web_name from {0}page_info where web_name='{1}'".format(title,company))
         if len(cursor.fetchall()) < 1:
-            page_url = current_page + '?' + "fields=id,name,category,location,cover,description,username,emails,talking_about_count,likes,website&key=value&access_token=" + APP_ID + "|" + APP_SECRET
-            json_fbpage = render_to_json(page_url)
+            try:
+                page_url = current_page + '?' + "key=value&access_token=" + APP_ID + "|" + APP_SECRET
+                if render_to_json(page_url)['privacy'] == 'OPEN':
+                    page_url = current_page + '?' + "fields=id,name,cover,description&key=value&access_token=" + APP_ID + "|" + APP_SECRET
+                    json_fbpage = render_to_json(page_url)
+                else:
+                    page_url = current_page + '?' + "fields=id,name,category,location,cover,description,username,emails,talking_about_count,likes,website&key=value&access_token=" + APP_ID + "|" + APP_SECRET
+                    json_fbpage = render_to_json(page_url)
+
+            except:        
+                page_url = current_page + '?' + "fields=id,name,category,location,cover,description,username,emails,talking_about_count,likes,website&key=value&access_token=" + APP_ID + "|" + APP_SECRET
+                json_fbpage = render_to_json(page_url)
+                
             if not json_fbpage: continue
             print (page_url)
         
@@ -1879,8 +1890,6 @@ def menu_interface(main_path):
     elif answer == "4":
         from analytics import analytics_main as analytics
         analytics.analytics_menu(path_)
-        
-        
         
     elif answer == "0":
         quit_interface()

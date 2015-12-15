@@ -262,8 +262,8 @@ def check_for_extra_data(path_,conn,db):
                         if str(file_).replace(".csv","") == "common_danish_words": cur.execute("insert into common_danish_words (word) VALUES (?)",[str(row[0])])
                         if str(file_).replace(".csv","") == "common_english_words": cur.execute("insert into common_english_words (word) VALUES (?)",[str(row[0])])
                         if str(file_).replace(".csv","") == "extrawords": cur.execute("insert into extrawords (word) VALUES (?)",[str(row[0])])
-                        if str(file_).replace(".csv","") == "male_names": cur.execute("insert into male_names (name) VALUES (?)",[row[0]])
-                        if str(file_).replace(".csv","") == "female_names": cur.execute("insert into female_names (name) VALUES (?)",[row[0]])
+                        if str(file_).replace(".csv","") == "male_names": cur.execute("insert into male_names (name) VALUES (?)",[str(row[0])])
+                        if str(file_).replace(".csv","") == "female_names": cur.execute("insert into female_names (name) VALUES (?)",[str(row[0])])
                     except:
                         print ("There was a problem with insertion of "+str(file_))
                 
