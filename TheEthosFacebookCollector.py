@@ -1392,7 +1392,7 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
                 json_fbpage = render_to_json(page_url)
                 true_switch = True
             except:
-                pass
+                json_fbpage = {}
             
             if not true_switch == True:
                 try:
@@ -1402,7 +1402,7 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
                         json_fbpage = render_to_json(page_url)
                     true_switch = True
                 except:        
-                    pass
+                    json_fbpage = {}
             if not true_switch == True:    
                 try:
                     page_url = current_page + '?' + "fields=start_time&key=value&access_token=" + APP_ID + "|" + APP_SECRET
@@ -1411,7 +1411,7 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
                         json_fbpage = render_to_json(page_url)
                     true_switch = True
                 except:
-                    pass
+                    json_fbpage = {}
                 
             if not json_fbpage: continue
             print (page_url)
