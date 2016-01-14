@@ -886,9 +886,10 @@ def make_gephi_files(db,db_path):
     
         g=nx.Graph()
         cur = conn.cursor()
-        cur.execute("select PL.liked_page_name, PL.liked_page_id, PA.page_id from {0}page_likes_info PL, {0}page_info PA where PA.web_name = PL.web_name limit 10000000".format(title))
+        cur.execute("select PL.liked_page_name, PL.liked_page_id, PA.page_id, PA.page_name, PA.category, PL.main_category from {0}page_likes_info PL, {0}page_info PA where PA.web_name = PL.web_name limit 10000000".format(title))
         for row in cur.fetchall():
-            g.add_node(row[1], label=str(row[0]))
+            g.add_node(row[1], cat=str(row[5]).split("/")[0], label=str(row[0]))
+            g.add_node(row[2], cat=str(row[4]).split("/")[0], label=str(row[3]))
             g.add_edge(row[2], row[1])
         nx.write_gexf(g, path+'/{0}page_likes.gexf'.format(title))
         
@@ -1381,19 +1382,36 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
             
         #insert the data we pulled into db
         cursor.execute("select web_name from {0}page_info where web_name='{1}'".format(title,company))
+        
         if len(cursor.fetchall()) < 1:
+            
+            true_switch = False
+            
             try:
-                page_url = current_page + '?' + "key=value&access_token=" + APP_ID + "|" + APP_SECRET
-                if render_to_json(page_url)['privacy'] == 'OPEN':
-                    page_url = current_page + '?' + "fields=id,name,cover,description&key=value&access_token=" + APP_ID + "|" + APP_SECRET
-                    json_fbpage = render_to_json(page_url)
-                else:
-                    page_url = current_page + '?' + "fields=id,name,category,location,cover,description,username,emails,talking_about_count,likes,website&key=value&access_token=" + APP_ID + "|" + APP_SECRET
-                    json_fbpage = render_to_json(page_url)
-
-            except:        
                 page_url = current_page + '?' + "fields=id,name,category,location,cover,description,username,emails,talking_about_count,likes,website&key=value&access_token=" + APP_ID + "|" + APP_SECRET
                 json_fbpage = render_to_json(page_url)
+                true_switch = True
+            except:
+                pass
+            
+            if not true_switch == True:
+                try:
+                    page_url = current_page + '?' + "key=value&access_token=" + APP_ID + "|" + APP_SECRET
+                    if render_to_json(page_url)['privacy'] == 'OPEN':
+                        page_url = current_page + '?' + "fields=id,name,cover,description&key=value&access_token=" + APP_ID + "|" + APP_SECRET
+                        json_fbpage = render_to_json(page_url)
+                    true_switch = True
+                except:        
+                    pass
+            if not true_switch == True:    
+                try:
+                    page_url = current_page + '?' + "fields=start_time&key=value&access_token=" + APP_ID + "|" + APP_SECRET
+                    if render_to_json(page_url)['start_time']:
+                        page_url = current_page + '?' + "fields=id,name,cover,description&key=value&access_token=" + APP_ID + "|" + APP_SECRET
+                        json_fbpage = render_to_json(page_url)
+                    true_switch = True
+                except:
+                    pass
                 
             if not json_fbpage: continue
             print (page_url)

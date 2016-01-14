@@ -123,7 +123,7 @@ def create_empty_pol_set(conn):
 
 def get_pol_from_id(by_id,pol_set,cur,db):
     
-    cur.execute("select PE.party, count(P.id) from {0}post_info P, political_entities PE where PE.web_name = P.web_name and P.id in (select post_id from {0}likes_info  where post_like_by_id = '{1}') group by PE.party".format(db,str(by_id)))
+    cur.execute("select PE.party, count(P.id) from {0}post_info P, political_entities PE, {0}page_info PA where PE.web_name = P.web_name and PA.web_name = P.web_name and P.post_made_by_id = PA.page_id and P.id in (select post_id from {0}likes_info  where post_like_by_id = '{1}') group by PE.party".format(db,str(by_id)))
     
     tempset = {}
     total_likes = float(0.0)
@@ -142,7 +142,6 @@ def get_pol_from_id(by_id,pol_set,cur,db):
 
 
 def make_batch_files(path_ ,conn, db):
-    
     
     global pol_by_id
     clear_screen()
