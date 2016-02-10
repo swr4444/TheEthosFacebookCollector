@@ -154,7 +154,7 @@ def make_batch_files(path_ ,conn, db):
     print ("Creating batch files, might take a while...")
     blank_set = create_empty_pol_set(conn)
     cur = conn.cursor()
-    cur.execute("CREATE INDEX IF NOT EXISTS idxw ON political_entities (web_name, id, name, party);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idxw ON political_entities (web_name, name, party);")
     conn.commit()
     
     cur.execute("select distinct post_like_by_id from {0}likes_info limit 1000000000000".format(db))
@@ -253,7 +253,7 @@ def check_for_extra_data(path_,conn,db):
             cur.execute("SELECT * FROM {0};".format(str(file_).replace(".csv","")))
             if not cur.fetchall():
                 print ("Inserting extra data...")
-                tempscript = codecs.open(path_+analytics+"/Extra_tables/"+file_,"r","utf-8")
+                tempscript = codecs.open(path_+analytics+"/Extra_tables/"+file_,"r","latin-1")
                 reader = csv.reader(tempscript)
                 for row in reader:
                     try:

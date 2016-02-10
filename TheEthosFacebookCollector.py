@@ -897,22 +897,23 @@ def make_gephi_files(db,db_path):
         
         g=nx.Graph()
         cur = conn.cursor()
-        if start_date:
-            cur.execute("select P.id, PA.page_name, P.post_made_by_name from {0}post_info P, {0}page_info PA where PA.web_name = P.web_name and date(P.post_time_created) between date('{1}') and date('{2}')".format(title,start_date,end_date))
+        """if start_date:
+            cur.execute("select P.id, PA.page_name, P.post_made_by P.post_made_by_name from {0}post_info P, {0}page_info PA where PA.web_name = P.web_name and P.post_made_by_id = PA.page_id and date(P.post_time_created) between date('{1}') and date('{2}')".format(title,start_date,end_date))
         else:
-            cur.execute("select P.id, PA.page_name, P.post_made_by_name from {0}post_info P, {0}page_info PA where PA.web_name = P.web_name".format(title))
+            cur.execute("select P.id, PA.page_name, P.post_made_by_name from {0}post_info P, {0}page_info PA where PA.web_name = P.web_name and P.post_made_by_id = PA.page_id".format(title))
         for row in cur.fetchall():
             g.add_node(row[1],label=str(row[1]))
             g.add_node(row[0],label=str(row[2]))
-            g.add_edge(row[0],row[1])
+            g.add_edge(row[0],row[1])"""
         
         if start_date:
-            cur.execute("select L.post_like_by_id, L.post_like_by_name, P.id from {0}likes_info L, {0}post_info P, {0}page_info PA where L.post_id = P.id and PA.web_name = P.web_name and date(P.post_time_created) between date('{1}') and date('{2}')".format(title,start_date,end_date))
+            cur.execute("select L.post_like_by_id, L.post_like_by_name, P.id, PA.page_id, PA.page_name from {0}likes_info L, {0}post_info P, {0}page_info PA where L.post_id = P.id and PA.web_name = P.web_name and P.post_made_by_id = PA.page_id and date(P.post_time_created) between date('{1}') and date('{2}')".format(title,start_date,end_date))
         else:
-            cur.execute("select L.post_like_by_id, L.post_like_by_name, P.id from {0}likes_info L, {0}post_info P, {0}page_info PA where L.post_id = P.id and PA.web_name = P.web_name".format(title))
+            cur.execute("select L.post_like_by_id, L.post_like_by_name, P.id, PA.page_id, PA.page_name from {0}likes_info L, {0}post_info P, {0}page_info PA where L.post_id = P.id and P.post_made_by_id = PA.page_id and PA.web_name = P.web_name".format(title))
         for row in cur.fetchall():
             g.add_node(row[0], label=str(row[1]))
-            g.add_edge(row[0], row[2])
+            g.add_node(row[3], label=str(row[4]))
+            g.add_edge(row[0], row[3])
         if start_date:
             nx.write_gexf(g, path+'/{0}post_likes_{1}_to_{2}.gexf'.format(title,start_date,end_date))
         else:
@@ -923,18 +924,18 @@ def make_gephi_files(db,db_path):
         g=nx.Graph()
         cur = conn.cursor()
         if start_date:
-            cur.execute("select P.id, PA.page_name, P.post_made_by_name from {0}post_info P, {0}page_info PA where PA.web_name = P.web_name and date(P.post_time_created) between date('{1}') and date('{2}')".format(title,start_date,end_date))
+            cur.execute("select P.id, PA.page_name, P.post_made_by_name from {0}post_info P, {0}page_info PA where PA.web_name = P.web_name and P.post_made_by_id = PA.page_id and date(P.post_time_created) between date('{1}') and date('{2}')".format(title,start_date,end_date))
         else:
-            cur.execute("select P.id, PA.page_name, P.post_made_by_name from {0}post_info P, {0}page_info PA where PA.web_name = P.web_name".format(title))
+            cur.execute("select P.id, PA.page_name, P.post_made_by_name from {0}post_info P, {0}page_info PA where PA.web_name = P.web_name and P.post_made_by_id = PA.page_id".format(title))
         for row in cur.fetchall():
             g.add_node(row[1],label=str(row[1]))
             g.add_node(row[0],label=str(row[2]))
             g.add_edge(row[0],row[1])
         
         if start_date:
-            cur.execute("select C.comment_made_by_id, C.comment_made_by_name, P.id from {0}comment_info C, {0}post_info P, {0}page_info PA where C.post_id = P.id and PA.web_name = P.web_name and date(P.post_time_created) between date('{1}') and date('{2}')".format(title,start_date,end_date))
+            cur.execute("select C.comment_made_by_id, C.comment_made_by_name, P.id from {0}comment_info C, {0}post_info P, {0}page_info PA where C.post_id = P.id and PA.web_name = P.web_name and P.post_made_by_id = PA.page_id and date(P.post_time_created) between date('{1}') and date('{2}')".format(title,start_date,end_date))
         else:
-            cur.execute("select C.comment_made_by_id, C.comment_made_by_name, P.id from {0}comment_info C, {0}post_info P, {0}page_info PA where C.post_id = P.id and PA.web_name = P.web_name".format(title))
+            cur.execute("select C.comment_made_by_id, C.comment_made_by_name, P.id from {0}comment_info C, {0}post_info P, {0}page_info PA where C.post_id = P.id and PA.web_name = P.web_name and P.post_made_by_id = PA.page_id".format(title))
         for row in cur.fetchall():
             g.add_node(row[0], label=str(row[1]))
             g.add_edge(row[0], row[2])
