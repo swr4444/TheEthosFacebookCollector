@@ -1442,10 +1442,17 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
             true_switch = False
             page_type = ""
             
+            #if True:
             try:
                 page_url = current_page + '?' + "fields=id,name,category,location,cover,description,username,emails,talking_about_count,likes,website&key=value&access_token=" + APP_ID + "|" + APP_SECRET
                 json_fbpage = render_to_json(page_url)
-                if not json_fbpage['data'][0]=="bad_request":
+                try:
+                    if not json_fbpage['data'][0]=="bad_request":
+                        true_switch = True
+                    else:
+                        true_switch = False
+                except:
+                    pass
                     true_switch = True
                 page_type = "page"
             except:
