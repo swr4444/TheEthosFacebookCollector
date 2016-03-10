@@ -79,7 +79,7 @@ def try_json_float(var_,keys_):
 def create_indeces(conn,title):
     
     cur = conn.cursor()
-    create_idx = "CREATE INDEX IF NOT EXISTS idx1 ON {0}page_info (web_name, id, page_name); CREATE INDEX IF NOT EXISTS idx2 ON {0}page_likes_info (web_name, id, liked_page_id, liked_page_name); CREATE INDEX IF NOT EXISTS idx3 ON {0}post_info (web_name, id, post_time_created, fb_post_id, post_made_by_id); CREATE INDEX IF NOT EXISTS idx4 ON {0}comment_info (comment_id,post_id, id,comment_made_by_id, comment_made_by_name, comment_time_created); CREATE INDEX IF NOT EXISTS idx5 ON {0}likes_info (post_like_by_id,post_id, id); CREATE INDEX IF NOT EXISTS idx6 ON {0}comment_likes_info (comment_id, id, comment_like_by_id); CREATE INDEX IF NOT EXISTS idx7 ON {0}replies_info (comment_id, id, reply_id, reply_made_by_id); CREATE INDEX IF NOT EXISTS idx8 ON {0}comment_tags_info (comment_id, id, tagged_id);".format(title)
+    create_idx = "CREATE INDEX IF NOT EXISTS idx1 ON {0}page_info (web_name, id, page_name); CREATE INDEX IF NOT EXISTS idx2 ON {0}page_likes_info (web_name, id, liked_page_id, liked_page_name); CREATE INDEX IF NOT EXISTS idx3 ON {0}post_info (web_name, id, post_time_created, fb_post_id, post_made_by_id); CREATE INDEX IF NOT EXISTS idx4 ON {0}comment_info (comment_id,post_id, id,comment_made_by_id, comment_made_by_name, comment_time_created); CREATE INDEX IF NOT EXISTS idxbi ON {0}likes_info (post_like_by_id); CREATE INDEX IF NOT EXISTS idxpi ON {0}likes_info (post_id); CREATE INDEX IF NOT EXISTS idx6 ON {0}comment_likes_info (comment_id, id, comment_like_by_id); CREATE INDEX IF NOT EXISTS idx7 ON {0}replies_info (comment_id, id, reply_id, reply_made_by_id); CREATE INDEX IF NOT EXISTS idx8 ON {0}comment_tags_info (comment_id, id, tagged_id);".format(title)
     for state in create_idx.split(";"):
         try:
             cur.execute(state)
@@ -357,7 +357,7 @@ def create_post_url(graph_url,firstdate,lastdate, APP_ID, APP_SECRET):
     else:
         stop = str(lastdate)[:-9]
     
-    post_args = "/feed/?fields=id,from.fields(id,name),shares,type,picture,object_id,created_time,caption,description,name,link,message&limit=25&since=" + stop + "&until=" + start + "&key=value&access_token=" + APP_ID + "|" + APP_SECRET
+    post_args = "/feed/?fields=id,from.fields(id,name),shares,type,picture,object_id,created_time,caption,description,name,link,message&limit=75&since=" + stop + "&until=" + start + "&key=value&access_token=" + APP_ID + "|" + APP_SECRET
     post_url = graph_url + post_args
  
     return post_url
@@ -661,7 +661,45 @@ def get_comments_data(comments_url, comment_data, comment_like_data, reply_data,
         if next_page is not None:
             get_comments_data(next_page, comment_data, comment_like_data, reply_data, reply_like_data, comment_tag_data, reply_tag_data, post_id,next_page_bool,title,connection,graph_url, APP_ID, APP_SECRET, False, fb_post_id)
         return [comment_data, comment_like_data, reply_data, reply_like_data, comment_tag_data, reply_tag_data]
- 
+
+def get_members_data(APP_ID, APP_SECRET,current_page,company):
+    
+    member_url = current_page + '/members?' + "limit=1000&key=value&access_token=" + APP_ID + "|" + APP_SECRET
+    print (member_url)
+    json_group_members = render_to_json(member_url)
+    next_member_page = json_group_members['paging']['next']
+    member_data = []
+    try_next_page = True
+    while try_next_page == True:
+        for member in json_group_members['data']:
+            member_data.append([member['id'],member['name'],str(datetime.datetime.now()).split(".")[0],company])
+        try:
+            json_group_members = render_to_json(next_member_page)
+            next_member_page = json_group_members['paging']['next']
+        except:
+            try_next_page = False
+    
+    print (len(member_data))
+    return member_data
+
+def update_member_data(company,cursor,APP_ID,APP_SECRET,current_page,insert_members,title):
+    
+    print (company)
+    print ("Updating group members...")
+    cursor.execute("select member_id from {0}group_member_info where web_name = '{1}'".format(title,company))
+    members = cursor.fetchall()
+    if members:
+        member_ids = []
+        for row in members:
+            member_ids.append(str(row[0]))
+        member_data = get_members_data(APP_ID, APP_SECRET, current_page, company)
+        new_member_count = 0
+        for member in member_data:
+            if not str(member[0]) in member_ids:
+                new_member_count+=1
+                cursor.execute(insert_members,member)
+        print ('number of new members: '+str(new_member_count))
+
 def make_count_tables(title,connection):
     
     cursor = connection.cursor()
@@ -1078,7 +1116,7 @@ def find_page_like_network(args):
     
 
 
-def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app_id,app_secret,db_path,only_page_likes,make_count):
+def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app_id,app_secret,db_path,only_page_likes,make_count,update_only_group_members=False):
     
     title = title_
     coll_list = coll_list_
@@ -1115,14 +1153,14 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
     #create db connection
     
     cursor.execute("CREATE  TABLE IF NOT EXISTS `{0}page_likes_info` (`liked_page_name` VARCHAR(200),`liked_page_id` VARCHAR(100), `main_category` VARCHAR(100),`sub_categories` TEXT,`web_name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);".format(title))
-    cursor.execute("CREATE  TABLE IF NOT EXISTS `{0}page_info` (`page_id` VARCHAR(100),`page_name` VARCHAR(200), `category` VARCHAR(100), `country` VARCHAR(100), `city` VARCHAR(100), `latitude` FLOAT, `longitude` FLOAT, `cover_pic_link` VARCHAR(400), `page_description` TEXT, `page_username` VARCHAR(100), `page_email` VARCHAR(200), `page_like_count` INT,`talking_about` INT, `page_website` VARCHAR(200), `web_name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);".format(title))
+    cursor.execute("CREATE  TABLE IF NOT EXISTS `{0}page_info` (`page_id` VARCHAR(100),`page_name` VARCHAR(200), `category` VARCHAR(100), `country` VARCHAR(100), `city` VARCHAR(100), `latitude` FLOAT, `longitude` FLOAT, `cover_pic_link` VARCHAR(400), `page_description` TEXT, `page_username` VARCHAR(100), `page_email` VARCHAR(200), `page_like_count` INT,`talking_about` INT, `page_website` VARCHAR(200), `page_type` VARCHAR(100), `web_name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);".format(title))
     cursor.execute("CREATE  TABLE IF NOT EXISTS `{0}post_info` (`fb_post_id` VARCHAR(100), `post_made_by_id` VARCHAR(100), `post_made_by_name` VARCHAR(100), `shares` INT, `post_type` VARCHAR(50), `post_picture` TEXT, `post_time_created` DATETIME, `post_caption` VARCHAR(300),`post_description` LONGTEXT,`post_headline` LONGTEXT, `post_link` VARCHAR(400), `post_message` LONGTEXT, `web_name` VARCHAR(200),`page_id` VARCHAR(300),`id` INTEGER PRIMARY KEY AUTOINCREMENT);".format(title))
-
+    cursor.execute("CREATE  TABLE IF NOT EXISTS `{0}group_member_info` (`member_id` VARCHAR(100),`member_name` VARCHAR(200), `insert_time` DATETIME, `web_name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);".format(title))
     
     #SQL statement for adding Facebook page data to database
     insert_info = ("INSERT INTO {0}page_info "
-                    "(page_id, page_name ,category, country, city, latitude, longitude, cover_pic_link, page_description, page_username, page_email, talking_about, page_like_count, page_website, web_name)"
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".format(title))
+                    "(page_id, page_name ,category, country, city, latitude, longitude, cover_pic_link, page_description, page_username, page_email, talking_about, page_like_count, page_website, page_type, web_name)"
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)".format(title))
     
     insert_page_likes_info = ("INSERT INTO {0}page_likes_info "
                     "(liked_page_name, liked_page_id ,main_category, sub_categories, web_name)"
@@ -1167,13 +1205,25 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
                        "(comment_id)"
                        "VALUES (?)").format(title)
                        
+    insert_members = ("INSERT INTO {0}group_member_info "
+                       "(member_id, member_name, insert_time, web_name)"
+                       "VALUES (?,?,?,?)").format(title)
+                       
     last_last_crawl = datetime.datetime.now()
     
     for company in list_companies:
+        
+        current_page = graph_url + company
+        
+        if update_only_group_members == True:
+            print ("No post data found.")
+            update_member_data(company, cursor, APP_ID, APP_SECRET, current_page, insert_members, title)
+        
+        if update_only_group_members == True: continue
+        
         print (company)
         first_run = False
         #make graph api url with company username
-        current_page = graph_url + company
         
         #open public page in facebook graph api
         
@@ -1226,6 +1276,9 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
         
         
         if update_new == True:
+            
+            update_member_data(company, cursor, APP_ID, APP_SECRET, current_page, insert_members, title)
+            
             #cursor.execute("select P2.fb_post_id, P2.id from {0}post_info P2, (select max(P.time_created) as T from {0}post_info P where P.web_name = '{1}') as SUB where P2.web_name = '{1}' and P2.time_created > subdate(SUB.T, INTERVAL 1 DAY) order by P2.time_created desc limit 100000000".format(title,company))
             cursor.execute("select distinct P.fb_post_id, P2.id from {0}newest_post_info P, {0}post_info P2 where P2.fb_post_id = P.fb_post_id and P.web_name = '{1}'".format(title,company))
             
@@ -1387,21 +1440,29 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
         if len(cursor.fetchall()) < 1:
             
             true_switch = False
+            page_type = ""
             
             try:
                 page_url = current_page + '?' + "fields=id,name,category,location,cover,description,username,emails,talking_about_count,likes,website&key=value&access_token=" + APP_ID + "|" + APP_SECRET
                 json_fbpage = render_to_json(page_url)
-                true_switch = True
+                if not json_fbpage['data'][0]=="bad_request":
+                    true_switch = True
+                page_type = "page"
             except:
                 json_fbpage = {}
             
             if not true_switch == True:
+                #if True:
                 try:
                     page_url = current_page + '?' + "key=value&access_token=" + APP_ID + "|" + APP_SECRET
                     if render_to_json(page_url)['privacy'] == 'OPEN':
                         page_url = current_page + '?' + "fields=id,name,cover,description&key=value&access_token=" + APP_ID + "|" + APP_SECRET
                         json_fbpage = render_to_json(page_url)
-                    true_switch = True
+                        page_type = "group"
+                        member_data = get_members_data(APP_ID, APP_SECRET, current_page, company)
+                        true_switch = True
+                    for member in member_data:
+                        cursor.execute(insert_members,member)
                 except:        
                     json_fbpage = {}
             if not true_switch == True:    
@@ -1410,7 +1471,8 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
                     if render_to_json(page_url)['start_time']:
                         page_url = current_page + '?' + "fields=id,name,cover,description&key=value&access_token=" + APP_ID + "|" + APP_SECRET
                         json_fbpage = render_to_json(page_url)
-                    true_switch = True
+                        page_type = "event"
+
                 except:
                     json_fbpage = {}
                 
@@ -1418,7 +1480,7 @@ def main_collect(title_,coll_list_,collect_new_,update_new_,number_of_weeks_,app
             print (page_url)
         
             #gather our page level JSON Data
-            page_data = [try_json_str(json_fbpage, ["id"]), try_json_str(json_fbpage, ["name"]), try_json_str(json_fbpage, ["category"]), try_json_str(json_fbpage, ["location","country"]), try_json_str(json_fbpage, ["location","city"]), try_json_float(json_fbpage, ["location","latitude"]), try_json_float(json_fbpage, ["location","longitude"]), try_json_str(json_fbpage, ["cover","source"]), try_json_str(json_fbpage, ["description"]), try_json_str(json_fbpage, ["username"]), try_json_list(json_fbpage, ["emails"],0), try_json_int(json_fbpage, ["talking_about_count"]), try_json_int(json_fbpage, ["likes"]), try_json_str(json_fbpage, ["website"]), company]
+            page_data = [try_json_str(json_fbpage, ["id"]), try_json_str(json_fbpage, ["name"]), try_json_str(json_fbpage, ["category"]), try_json_str(json_fbpage, ["location","country"]), try_json_str(json_fbpage, ["location","city"]), try_json_float(json_fbpage, ["location","latitude"]), try_json_float(json_fbpage, ["location","longitude"]), try_json_str(json_fbpage, ["cover","source"]), try_json_str(json_fbpage, ["description"]), try_json_str(json_fbpage, ["username"]), try_json_list(json_fbpage, ["emails"],0), try_json_int(json_fbpage, ["talking_about_count"]), try_json_int(json_fbpage, ["likes"]), try_json_str(json_fbpage, ["website"]),page_type, company]
             
             cursor.execute(insert_info, page_data)
             page_likes_data = get_page_likes(create_page_likes_url(graph_url, company, APP_ID, APP_SECRET), [], company)
@@ -1787,9 +1849,18 @@ def menu_interface(main_path):
             
             connection = connect_db(path_+crawl_logs,db_title)
             cur = connection.cursor()
+            title_ = '{0}'.format(db_title)
+            coll_list = r'{0}'.format(db_list_name)  
             try:
                 cur.execute("select post_time_created from {0}post_info".format(db_title))
                 num_tuples = len(cur.fetchall())
+                if num_tuples == 0:
+                    cur.execute("select member_id from {0}group_member_info".format(db_title))
+                    num_tuples = len(cur.fetchall())
+                    if num_tuples > 1:
+                        main_collect(title_, coll_list, False, False, 1, app_id, app_secret, path_+crawl_logs, only_page_likes, make_count, update_only_group_members=True)
+                        answer = get_inp("Press any key to continue")
+                        menu_interface(main_path)
             except:
                 num_tuples = 0
             if not num_tuples > 0:
@@ -1807,9 +1878,7 @@ def menu_interface(main_path):
             answer = get_inp(">>> ")
             while check_answer(answer,"y","n") == False:
                 answer = get_inp(">>> ")
-            if answer == "y":
-                title_ = '{0}'.format(db_title)
-                coll_list = r'{0}'.format(db_list_name)                
+            if answer == "y":              
                 clear_screen()
                 main_collect(title_, coll_list, collect_new, update_new, 1,app_id,app_secret,path_+crawl_logs,only_page_likes,make_count)
                 answer = get_inp("Press any key to continue")

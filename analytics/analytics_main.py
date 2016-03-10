@@ -6,6 +6,9 @@ import pickle
 import codecs
 import csv
 import datetime
+import urllib.request
+from bs4 import BeautifulSoup
+import re
 
 FBC = '/FBC_databases'
 crawl_logs = '/DB'
@@ -14,6 +17,35 @@ page_lists = '/Page Lists'
 analytics = '/analytics'
 global pol_by_id
 pol_by_id = {}
+
+def find_names(url_list,only_first_names):
+    
+    name_list = []
+    
+    for url in url_list:
+        try:    
+            web_response = urllib.request.urlopen(url)
+            readable_page = web_response.read().decode('latin-1')
+            
+            html = readable_page.encode('latin-1')
+            soup = BeautifulSoup(html, "html.parser")
+            text_ = soup.find_all()
+            for element in text_:
+                raw_text = str(element.text).rstrip().replace('\n',' ').replace('Denne','').replace("\t"," ")
+                if only_first_names == False:
+                    names = re.sub( '\s+', ' ', raw_text ).strip()
+                    print (names)
+                    names = re.findall(r"([A-Z][\w-]+(?=\s[A-Z])(?:\s[A-Z][\w-]+)+)",names.rstrip())
+                else:
+                    names = re.findall(r"([A-Z][\w-]+)",raw_text.rstrip())                
+                for name in names:
+                    if name not in name_list:
+                        name_list.append(str(name))
+        except:
+            #print ("Text find not possible")
+            pass
+        
+    return name_list
 
 def quit_interface():
     clear_screen()
@@ -40,6 +72,28 @@ def clear_screen():
         os.system('cls')
     else:
         os.system('clear')
+        
+def get_first_names(path_,gender='male'):
+    
+    if gender == 'male':
+        if os.path.isfile(path_+analytics+"/batch/"+"danske_drengenavne.p"):
+            male_names = pickle.load(open(path_+analytics+"/batch/"+"danske_drengenavne.p", "rb" ))
+        else:
+            rn_list = ["http://www.danskernesnavne.navneforskning.ku.dk/Topnavne/Topnavn_reg10_s1_f.asp"]
+            male_names = find_names(rn_list,True)
+            pickle.dump(male_names, open(path_+analytics+"/batch/"+"danske_drengenavne.p", "wb" ))
+            
+        return male_names
+            
+    elif gender == 'female':
+        if os.path.isfile(path_+analytics+"/batch/"+"danske_pigenavne.p"):
+            female_names = pickle.load(open(path_+analytics+"/batch/"+"danske_pigenavne.p", "rb" ))
+        else:
+            rn_list = ["http://www.danskernesnavne.navneforskning.ku.dk/Topnavne/Topnavn_reg10_s0_f.asp"]
+            female_names = find_names(rn_list,True)
+            pickle.dump(female_names, open(path_+analytics+"/batch/"+"danske_pigenavne.p", "wb" ))
+            
+        return female_names
         
 def find_gender(conn, db):
     
@@ -88,9 +142,21 @@ def find_gender(conn, db):
         
     conn.commit()
         
-
-def check_answer(answer,*args):
+def analysis_complete():
     
+    print ("\n")
+    print ("Analysis complete.")
+    print ("\n")
+    answer = get_inp("Press any key to continue")
+
+
+def check_answer(answer,*args, answer_length=0):
+    
+    if answer_length > 0:
+        if len(str(answer)) < answer_length:
+            return True
+        else:
+            print ("Input too long")
     
     for arg in list(args):
        
@@ -108,7 +174,77 @@ def check_date_answer(answer):
         print ("Please enter a valid answer")
         return False
     
+def set_custom_values(values):
+    
+    clear_screen()
+    current_values = values
+    new_values = {}
+    
+    v_count = 0
+    for k,v in values.items():
+        v_count += 1
+        new_values[str(v_count)]=k
+    
+    def change_value(new_values,current_values,choice_value):
+        
+        if current_values[new_values[choice_value]] == False:
+            current_values[new_values[choice_value]]=True
+        else:
+            current_values[new_values[choice_value]]=False
+        
+    def show_values(new_values,current_values):
+        
+        for k,v in new_values.items():
+            if current_values[v] == False:
+                new_v = "No"
+            else:
+                new_v = "Yes"
+                
+            print (str(k)+". "+str(v).replace("_","")+"  :  "+str(new_v))
+    
+    answer = ""
+    while answer != 'done':
+        print ("Enter the setting you wish to change. Enter 'done' when finished")
+        print ("\n")
+        show_values(new_values,current_values)
+        print ("\n")
+        answer = get_inp(">>> ")
+        while check_answer(answer,*new_values.keys(),'done') == False:
+            answer = get_inp(">>> ")
+        if answer != 'done':
+            change_value(new_values, current_values, answer)
+            clear_screen()
+            
+    return current_values
 
+
+def select_pages_from_db(conn,db):
+    
+    clear_screen()
+    web_names = {}
+    chosen_pages = []
+    pages = {}
+    cur = conn.cursor()
+    cur.execute("select page_name,web_name from {0}page_info limit 100000".format(db))
+    row_count = 0
+    for row in cur.fetchall():
+        row_count += 1
+        pages[str(row_count)]=str(row[0])
+        web_names[str(row[0])]=str(row[1])
+        
+    answer = ""
+    while answer != 'done':
+        print ("Please enter the page you want to add. Enter 'done' when finished.")
+        answer = get_inp(">>> ")        
+        while check_answer(answer,*pages.keys()) == False:
+            answer = get_inp(">>> ")
+        clear_screen()
+        chosen_pages.append(web_names[pages[answer]])
+        print (str(pages[answer]) + " has been added.")
+        print ("\n")
+    
+    return chosen_pages
+    
 
 def create_empty_pol_set(conn):
     
@@ -123,7 +259,7 @@ def create_empty_pol_set(conn):
 
 def get_pol_from_id(by_id,pol_set,cur,db):
     
-    cur.execute("select PE.party, count(P.id) from {0}post_info P, political_entities PE, {0}page_info PA where PE.web_name = P.web_name and PA.web_name = P.web_name and P.post_made_by_id = PA.page_id and P.id in (select post_id from {0}likes_info  where post_like_by_id = '{1}') group by PE.party".format(db,str(by_id)))
+    cur.execute("select PE.party, count(P.id) from {0}post_info P, political_entities PE, {0}page_info PA where PE.web_name = PA.web_name and P.post_made_by_id = PA.page_id and P.id in (select post_id from {0}likes_info indexed by idxbi where post_like_by_id = '{1}') group by PE.party".format(db,str(by_id)))
     
     tempset = {}
     total_likes = float(0.0)
@@ -248,6 +384,14 @@ def check_for_extra_data(path_,conn,db):
     cur.execute("CREATE  TABLE IF NOT EXISTS `extrawords` (`word` text,`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
     cur.execute("CREATE  TABLE IF NOT EXISTS `male_names` (`name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
     cur.execute("CREATE  TABLE IF NOT EXISTS `female_names` (`name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
+    cur.execute('select * from female_names')
+    if not cur.fetchall():
+        for name in get_first_names(path_, gender='female'):
+            cur.execute("insert into female_names (name) VALUES (?)",[name])
+    cur.execute('select * from male_names')
+    if not cur.fetchall():
+        for name in get_first_names(path_, gender='male'):
+            cur.execute("insert into male_names (name) VALUES (?)",[name])
     for file_ in listdir(path_+analytics+"/Extra_tables"):
         if ".csv" in str(file_):
             cur.execute("SELECT * FROM {0};".format(str(file_).replace(".csv","")))
@@ -258,11 +402,9 @@ def check_for_extra_data(path_,conn,db):
                 for row in reader:
                     try:
                         if str(file_).replace(".csv","") == "political_entities": cur.execute("insert into political_entities (name,web_name,party) VALUES (?,?,?)",[row[0],row[1],row[2]])
-                        if str(file_).replace(".csv","") == "common_danish_words": cur.execute("insert into common_danish_words (word) VALUES (?)",[str(row[0])])
-                        if str(file_).replace(".csv","") == "common_english_words": cur.execute("insert into common_english_words (word) VALUES (?)",[str(row[0])])
-                        if str(file_).replace(".csv","") == "extrawords": cur.execute("insert into extrawords (word) VALUES (?)",[str(row[0])])
-                        if str(file_).replace(".csv","") == "male_names": cur.execute("insert into male_names (name) VALUES (?)",[str(row[0])])
-                        if str(file_).replace(".csv","") == "female_names": cur.execute("insert into female_names (name) VALUES (?)",[str(row[0])])
+                        if str(file_).replace(".csv","") == "common_danish_words": cur.execute("insert into common_danish_words (word) VALUES (?)",[row[0]])
+                        if str(file_).replace(".csv","") == "common_english_words": cur.execute("insert into common_english_words (word) VALUES (?)",[row[0]])
+                        if str(file_).replace(".csv","") == "extrawords": cur.execute("insert into extrawords (word) VALUES (?)",[row[0]])
                     except:
                         print ("There was a problem with insertion of "+str(file_))
                 
@@ -326,9 +468,10 @@ def analytics_pol_menu(path_,conn,db):
         print ("2. Gender_Pol_Modelling (Requires numpy, matplotlib and easygui)")
         print ("3. Pol_Network_Modelling (Requires numpy, matplotlib and networkx)")
         print ("4. Pol_Keyword_Modelling (Requires numpy, matplotlib and nltk)")
+        print ("5. Overall political swing")
         print ("0. Quit program")
         answer = get_inp(">>> ")
-        while check_answer(answer,"1","2","3","4","0") == False:
+        while check_answer(answer,"1","2","3","4","5","0") == False:
             answer = get_inp(">>> ")
             
         if answer == "1":
@@ -371,6 +514,39 @@ def analytics_pol_menu(path_,conn,db):
         elif answer == "4":
             import analytics.keyword_pol as kp
             kp.start_keywords(db, conn, path_)
+            analytics_start_menu(conn, db, path_)
+            
+        elif answer == "5":
+            clear_screen()
+            import analytics.Political_swing as pw
+            political_swing_settings = {"compare_":False,"election_weights_":False,"print_result":True}
+            print ("What do you want as title for your output? Max 70 characters.")
+            answer = get_inp(">>> ")
+            while check_answer(answer,answer_length=70) == False:
+                answer = get_inp(">>> ")
+            title = str(answer)
+            clear_screen()
+            print ("Do you want select pages or all pages in the database?")
+            print ("\n")
+            print ("1. All pages")
+            print ("2. select pages")
+            answer = get_inp(">>> ")
+            while check_answer(answer,"1","2") == False:
+                answer = get_inp(">>> ")
+            if str(answer) == "1":
+                political_swing_settings = set_custom_values(political_swing_settings)
+                pw.get_swing(path_,conn,db,[],title_=title,**political_swing_settings)
+                analysis_complete()
+                
+            elif answer == "2":
+                select_pages_from_db(conn, db)
+                political_swing_settings = set_custom_values(political_swing_settings)
+                pw.get_swing(path_,conn,db,[],title_=title,**political_swing_settings)
+                analysis_complete()
+                
+            elif answer == "0":
+                quit_interface()
+                
             analytics_start_menu(conn, db, path_)
             
         elif answer == "0":
