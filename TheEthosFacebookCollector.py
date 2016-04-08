@@ -7,7 +7,7 @@ import time
 import codecs
 import datetime
 from os import listdir
-from wheel.signatures.djbec import dsa_test
+
 if sys.version_info[0] < 3:
     print ("You need Python 3")
     sys.exit()
