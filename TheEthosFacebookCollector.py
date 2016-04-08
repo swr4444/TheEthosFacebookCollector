@@ -7,6 +7,7 @@ import time
 import codecs
 import datetime
 from os import listdir
+from wheel.signatures.djbec import dsa_test
 if sys.version_info[0] < 3:
     print ("You need Python 3")
     sys.exit()
@@ -599,7 +600,7 @@ def get_comments_data(comments_url, comment_data, comment_like_data, reply_data,
             #if comment:
             try:
                 current_comments = [try_json_str(comment, ["id"]), str(comment["message"]), comment["like_count"],
-                                comment["created_time"].replace('T',' ').replace('+0000',''), try_json_str(comment,['from','id']), try_json_str(comment,['from','id']),post_id]
+                                comment["created_time"].replace('T',' ').replace('+0000',''), try_json_str(comment,['from','id']), try_json_str(comment,['from','name']),post_id]
                 #print current_comments
                 comment_data.append(current_comments)
                 
@@ -918,7 +919,7 @@ def make_gephi_files(db,db_path):
         print ("you need networkx")
         sys.exit()
         
-    network_choice = {"1":"Page Likes","2":"Posts and Likes","3":"Posts and Comments"}
+    network_choice = {"1":"Page Likes","2":"Posts and Likes","3":"Posts and Comments","4":"All interactions"}
     
     def make_page_likes(conn,title,path):
     
@@ -981,7 +982,148 @@ def make_gephi_files(db,db_path):
             nx.write_gexf(g, path+'/{0}post_comments_{1}_to_{2}.gexf'.format(title,start_date,end_date))
         else:
             nx.write_gexf(g, path+'/{0}post_comments.gexf'.format(title))
-    
+            
+    def make_all_interactions(conn,title,path,start_date="",end_date="",user_orient=True):
+        
+        #print ("Building network...")
+        
+        def renew_edge_list(edge_list,pair):
+            
+            if (pair[0],pair[1]) in edge_list:
+                edge_list[(pair[0],pair[1])]+=1
+            elif (pair[1],pair[0]) in edge_list:
+                edge_list[(pair[1],pair[0])]+=1
+            else:
+                edge_list[(pair[0],pair[1])]=1
+            
+            return edge_list
+        
+        def find_actor_type(page_ids,id_):
+            
+            if id_ in page_ids:
+                return "page"
+            else:
+                return "user"
+            
+        def add_edge_weights(g,edge_list):
+            
+            new_g = g.copy()
+            ed = g.edges()
+            for edge in ed:
+                if (edge[0],edge[1]) in edge_list:
+                    new_g.remove_edge(edge[0],edge[1])
+                    new_g.add_edge(edge[0],edge[1],weight=edge_list[(edge[0],edge[1])])
+                elif (edge[1],edge[0]) in edge_list:
+                    new_g.remove_edge(edge[1],edge[0])
+                    new_g.add_edge(edge[1],edge[0],weight=edge_list[(edge[1],edge[0])])
+                else:
+                    pass
+            
+            return new_g
+
+        g=nx.Graph()
+        cur = conn.cursor()
+        post_ids = []
+        edge_list = {}
+        page_ids = {}
+        cur.execute("select page_id from {0}page_info limit 1000000".format(title))
+        for row in cur.fetchall():
+            page_ids[str(row[0])]=True
+        #print (page_ids)
+        if start_date:
+            cur.execute("select P.post_made_by_id, P.post_made_by_name, P.post_message, P.post_link, P.id, PA.page_id, PA.page_name, PA.category, PA.country from {0}post_info P, {0}page_info PA where P.web_name = PA.web_name and date(P.post_time_created) between date('{1}') and date('{2}')".format(title,start_date,end_date))
+        else:
+            cur.execute("select P.post_made_by_id, P.post_made_by_name, P.post_message, P.post_link, P.id, PA.page_id, PA.page_name, PA.category, PA.country from {0}post_info P, {0}page_info PA where P.web_name = PA.web_name".format(title))
+        for row in cur.fetchall():
+            post_id = str(row[4])
+            post_ids.append(post_id)
+            if user_orient == True:
+                g.add_node(str(row[0]),label=row[1],type=find_actor_type(page_ids, str(row[0])))
+                g.add_node(str(row[5]),label=row[6],type=find_actor_type(page_ids, str(row[5])),category=str(row[7]),country=str(row[8]))
+                g.add_edge(str(row[0]),str(row[5]))
+                edge_list = renew_edge_list(edge_list, (str(row[0]),str(row[5])))
+            else:
+                g.add_node(post_id,label=row[1],type="post",message=row[2],link=str(row[3]))
+                g.add_node(str(row[5]),label=row[6],type=find_actor_type(page_ids, str(row[5])),category=str(row[7]),country=str(row[8]))
+                g.add_edge(post_id,str(row[5]))
+                edge_list = renew_edge_list(edge_list, (post_id,str(row[5])))
+            cur.execute("select L.post_like_by_id, L.post_like_by_name from {0}likes_info L where L.post_id = '{1}'".format(title,post_id))
+            for rowl in cur.fetchall():
+                if user_orient == True:
+                    #print (type(rowl[1]))
+                    g.add_node(str(rowl[0]),label=rowl[1],type=find_actor_type(page_ids, str(rowl[0])))
+                    g.add_edge(str(rowl[0]),str(row[0]))
+                    edge_list = renew_edge_list(edge_list, (str(rowl[0]),str(row[0])))
+                else:
+                    g.add_node(str(rowl[0]),label=rowl[1],type=find_actor_type(page_ids, str(rowl[0])))
+                    g.add_edge(str(post_id),str(rowl[0]))
+                    edge_list = renew_edge_list(edge_list, (str(rowl[0]),post_id))
+            cur.execute("select C.comment_made_by_id, C.comment_made_by_name, C.comment_message, C.comment_id from {0}comment_info C where C.post_id = '{1}'".format(title,post_id))
+            for rowc in cur.fetchall():
+                comment_id = str(rowc[3])
+                if user_orient == True:
+                    g.add_node(str(rowc[0]),label=rowc[1],type=find_actor_type(page_ids, str(rowc[0])))
+                    g.add_edge(str(rowc[0]),str(row[0]))
+                    edge_list = renew_edge_list(edge_list, (str(rowc[0]),str(row[0])))
+                else:
+                    g.add_node(str(comment_id),label=rowc[1],message=rowc[2],type="comment")
+                    g.add_edge(post_id,comment_id)
+                    edge_list = renew_edge_list(edge_list, (comment_id,post_id))
+                cur.execute("select CL.comment_like_by_id, CL.comment_like_by_name from {0}comment_likes_info CL where CL.comment_id = '{1}'".format(title,comment_id))
+                for rowcl in cur.fetchall():
+                    if user_orient == True:
+                        g.add_node(str(rowcl[0]),label=rowcl[1],type=find_actor_type(page_ids, str(rowcl[0])))
+                        g.add_edge(str(rowcl[0]),str(rowc[0]))
+                        edge_list = renew_edge_list(edge_list, (str(rowcl[0]),str(rowc[0])))
+                    else:
+                        g.add_node(str(rowcl[0]),label=rowcl[1],type=find_actor_type(page_ids, str(rowcl[0])))
+                        g.add_edge(str(comment_id),str(rowcl[0]))
+                        edge_list = renew_edge_list(edge_list, (str(rowcl[0]),comment_id))
+                cur.execute("select CT.tagged_id, CT.tagged_name from {0}comment_tags_info CT where CT.comment_id = '{1}'".format(title,comment_id))
+                for rowct in cur.fetchall():
+                    if user_orient == True:
+                        g.add_node(str(rowct[0]),label=rowct[1].decode('utf-8'), type=find_actor_type(page_ids, str(rowct[0])))
+                        g.add_edge(str(rowct[0]),str(rowc[0]))
+                        edge_list = renew_edge_list(edge_list, (str(rowct[0]),str(rowc[0])))
+                    else:
+                        g.add_node(str(rowct[0]),label=str(rowct[1]),type=find_actor_type(page_ids, str(rowct[0])))
+                        g.add_edge(str(comment_id),str(rowct[0]))
+                        edge_list = renew_edge_list(edge_list, (str(rowct[0]),comment_id))
+                cur.execute("select R.reply_made_by_id, R.reply_made_by_name, R.reply_message, R.reply_id from {0}replies_info R where R.comment_id = '{1}'".format(title,comment_id))
+                for rowr in cur.fetchall():
+                    reply_id = str(rowr[3])
+                    if user_orient == True:
+                        g.add_node(str(rowr[0]),label=rowr[1],type=find_actor_type(page_ids, str(rowr[0])))
+                        g.add_edge(str(rowr[0]),str(rowc[0]))
+                        edge_list = renew_edge_list(edge_list, (str(rowr[0]),str(rowc[0])))
+                    else:
+                        g.add_node(str(reply_id),label=rowr[1],message=row[2],type="reply")
+                        g.add_edge(str(comment_id),str(reply_id))
+                        edge_list = renew_edge_list(edge_list, (str(reply_id),comment_id))
+                    cur.execute("select RL.reply_like_by_id, RL.reply_like_by_name from {0}reply_likes_info RL where RL.reply_id = '{1}'".format(title,reply_id))
+                    for rowrl in cur.fetchall():
+                        if user_orient == True:
+                            g.add_node(str(rowrl[0]),label=rowrl[1],type=find_actor_type(page_ids, str(rowrl[0])))
+                            g.add_edge(str(rowrl[0]),str(rowr[0]))
+                            edge_list = renew_edge_list(edge_list, (str(rowrl[0]),str(rowr[0])))
+                        else:
+                            g.add_node(str(rowrl[0]),label=rowrl[1],type=find_actor_type(page_ids, str(rowrl[0])))
+                            g.add_edge(str(rowrl[0]),str(reply_id))
+                            edge_list = renew_edge_list(edge_list, (str(rowrl[0]),reply_id))
+        
+        g = add_edge_weights(g, edge_list)
+         
+        if start_date:
+            if user_orient == True:
+                nx.write_gexf(g, path+'/{0}all_interactions_{1}_to_{2}_only_users.gexf'.format(title,start_date,end_date))
+            else:
+                nx.write_gexf(g, path+'/{0}all_interactions_{1}_to_{2}.gexf'.format(title,start_date,end_date))
+        else:
+            if user_orient == True:
+                nx.write_gexf(g, path+'/{0}all_interactions_only_users.gexf'.format(title))
+            else:
+                nx.write_gexf(g, path+'/{0}all_interactions.gexf'.format(title))
+               
     def choose_gephi_files(connection, title, path):
         
         clear_screen()
@@ -1017,6 +1159,20 @@ def make_gephi_files(db,db_path):
                 make_comments(connection, title, path)
             except:
                 print ("No data available...")
+                
+        elif answer == "4":
+            try:
+                print ("Do you want a users only network? y/n")
+                answer = get_inp(">>> ")
+                while check_answer(answer,"y","n") == False:
+                    answer = get_inp(">>> ")
+                if answer == "n":
+                    make_all_interactions(connection, title, path, user_orient=False)
+                elif answer == "y":
+                    make_all_interactions(connection, title, path, user_orient=True)
+                print ("writing Gephi files...")
+            except:
+                print ("No data available...")
         
         elif answer == "9":
             data_types = ""
@@ -1024,11 +1180,11 @@ def make_gephi_files(db,db_path):
             import analytics.pol_network as pn
             print ("What kind of network do you want?")
             print ("\n")
-            #print ("1. All Interactions")
+            print ("1. All Interactions")
             print ("2. Posts and Likes")
             print ("3. Posts and Comments")
             answer = get_inp(">>> ")
-            while check_answer(answer,"2","3") == False:
+            while check_answer(answer,"2","3","1") == False:
                 answer = get_inp(">>> ")
             network_kind = answer
             clear_screen()
@@ -1043,9 +1199,21 @@ def make_gephi_files(db,db_path):
             while check_date_answer(answer) == False:
                 answer = get_inp(">>> ")
             end_date = str(answer)
-            if network_kind == '1': pass
-            if network_kind == '2': make_post_likes(connection, title, path, start_date=start_date, end_date=end_date)
-            if network_kind == '3': make_comments(connection, title, path, start_date=start_date, end_date=end_date)
+            if network_kind == '1':
+                try:
+                    print ("Do you want a users only network? y/n")
+                    answer = get_inp(">>> ")
+                    while check_answer(answer,"y","n") == False:
+                        answer = get_inp(">>> ")
+                    if answer == "n":
+                        make_all_interactions(connection, title, path, user_orient=False)
+                    elif answer == "y":
+                        make_all_interactions(connection, title, path, user_orient=True)
+                    print ("writing Gephi files...")
+                except:
+                    print ("No data available...")
+            elif network_kind == '2': make_post_likes(connection, title, path, start_date=start_date, end_date=end_date)
+            elif network_kind == '3': make_comments(connection, title, path, start_date=start_date, end_date=end_date)
             
     
     def gephi_make(db,path):
@@ -1096,13 +1264,19 @@ def find_page_like_network(args):
             page_list.append(p.strip())
         
         for p in page_list:
-            url = create_page_likes_url(graph_url, p, app_id, app_secret)
-            page_list2 = get_page_likes(url, page_list2, p)
+            try:
+                url = create_page_likes_url(graph_url, p, app_id, app_secret)
+                page_list2 = get_page_likes(url, page_list2, p)
+            except:
+                pass
         
         if degree > 1:
             for p in page_list2:
-                url = create_page_likes_url(graph_url, p, app_id, app_secret)
-                page_list_final = get_page_likes(url, page_list_final, p)
+                try:
+                    url = create_page_likes_url(graph_url, p, app_id, app_secret)
+                    page_list_final = get_page_likes(url, page_list_final, p)
+                except:
+                    pass
         else:
             page_list_final = page_list2
             

@@ -6,8 +6,6 @@ import pickle
 import codecs
 import csv
 import datetime
-import urllib.request
-from bs4 import BeautifulSoup
 import re
 
 FBC = '/FBC_databases'
@@ -20,6 +18,8 @@ pol_by_id = {}
 
 def find_names(url_list,only_first_names):
     
+    import urllib.request
+    from bs4 import BeautifulSoup
     name_list = []
     
     for url in url_list:
@@ -486,11 +486,11 @@ def analytics_pol_menu(path_,conn,db):
         elif answer == "3":
             data_types = ""
             clear_screen()
-            import analytics.pol_network as pn
+            import analytics.pol_network2 as pn
             print ("What data do you want?")
             print ("\n")
             print ("1. All")
-            print ("2. Comments")
+            #print ("2. Comments")
             answer = get_inp(">>> ")
             while check_answer(answer,"1","2") == False:
                 answer = get_inp(">>> ")
@@ -508,7 +508,7 @@ def analytics_pol_menu(path_,conn,db):
             while check_date_answer(answer) == False:
                 answer = get_inp(">>> ")
             end_date = str(answer)
-            pn.draw_undi_graph(conn, db, path_, data_types, start_date, end_date)
+            pn.make_all_pol_interactions(conn, db, path_, data_types=data_types, start_date=start_date, end_date=end_date)
             analytics_start_menu(conn, db, path_)
             
         elif answer == "4":

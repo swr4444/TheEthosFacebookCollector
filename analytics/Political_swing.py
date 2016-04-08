@@ -45,7 +45,7 @@ def get_election_results_weight(country_avg):
     for party,percentage in country_avg.items():
         election_results = {'F':4.2,'OE':7.8,'A':26.3,'B':4.6,'AA':4.8,'Q':0.8,'I':7.5,'C':3.4,'V':19.5,'O':21.1,'N':0.98}
         election_result = election_results[party]
-        weight = float((float(election_result/100)-float(percentage)))
+        weight = float(float(election_result/float(percentage)))
         weights[party]=weight
         #print (party + "\t" + str(weight) + "\t" + str(percentage))
         
@@ -104,7 +104,7 @@ def aggregate_likers(liker_list,print_len,normalize,party_,cur,title=""):
 def election_results_weight(party,percentage):
     
     global election_weights
-    weighted_percentage = float(percentage+election_weights[party])
+    weighted_percentage = float(percentage*election_weights[party])
     return weighted_percentage
 
 def make_election_weights(aggregated_likers_list,title=""):
@@ -113,8 +113,13 @@ def make_election_weights(aggregated_likers_list,title=""):
     for k,v in aggregated_likers_list.items():
         new_list[k]=election_results_weight(k, v)
         #print (k+"\t"+str(round(election_results_weight(k, v),2))+"\t"+title)
-        
-    return new_list
+    
+    final_list = {}
+    totals = float(100)/float(sum(new_list.values()))
+    for k,v in new_list.items():
+        final_list[k]=v*totals
+    
+    return final_list
 
 def compare_aggregated_likers(set1,set2,comparename='X'):
     
@@ -250,11 +255,9 @@ def get_swing(Main_path_,conn_,DB,pages_,title_="",compare_=False,election_weigh
         print ("\n")
         print ("OVERALL POLITICAL SWING:")
         print ("\n")
-        totals = 0.0
         for k,v in result.items():
-            print (str(k) + "\t" + str(round(v*100,3)) + "\t" + title)
-            totals = v + totals
-        #print (totals)
+            print (str(k) + "\t" + str(round(v,3)) + "\t" + title)
+        #print (sum(result.values()))
     
     global election_weights
     global pol_ids
