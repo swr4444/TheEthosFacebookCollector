@@ -16,6 +16,7 @@ analytics = '/analytics'
 global pol_by_id
 pol_by_id = {}
 
+
 def find_names(url_list,only_first_names):
     
     import urllib.request
@@ -74,6 +75,9 @@ def clear_screen():
         os.system('clear')
         
 def get_first_names(path_,gender='male'):
+    
+    if not os.path.exists(path_+analytics+"/batch"):
+        os.makedirs(path_+analytics+"/batch")
     
     if gender == 'male':
         if os.path.isfile(path_+analytics+"/batch/"+"danske_drengenavne.p"):
@@ -209,7 +213,7 @@ def set_custom_values(values):
         show_values(new_values,current_values)
         print ("\n")
         answer = get_inp(">>> ")
-        while check_answer(answer,*new_values.keys(),'done') == False:
+        while check_answer(answer,'done',*new_values.keys()) == False:
             answer = get_inp(">>> ")
         if answer != 'done':
             change_value(new_values, current_values, answer)
@@ -384,14 +388,7 @@ def check_for_extra_data(path_,conn,db):
     cur.execute("CREATE  TABLE IF NOT EXISTS `extrawords` (`word` text,`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
     cur.execute("CREATE  TABLE IF NOT EXISTS `male_names` (`name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
     cur.execute("CREATE  TABLE IF NOT EXISTS `female_names` (`name` VARCHAR(200),`id` INTEGER PRIMARY KEY AUTOINCREMENT);")
-    cur.execute('select * from female_names')
-    if not cur.fetchall():
-        for name in get_first_names(path_, gender='female'):
-            cur.execute("insert into female_names (name) VALUES (?)",[name])
-    cur.execute('select * from male_names')
-    if not cur.fetchall():
-        for name in get_first_names(path_, gender='male'):
-            cur.execute("insert into male_names (name) VALUES (?)",[name])
+    
     for file_ in listdir(path_+analytics+"/Extra_tables"):
         if ".csv" in str(file_):
             cur.execute("SELECT * FROM {0};".format(str(file_).replace(".csv","")))
@@ -407,7 +404,19 @@ def check_for_extra_data(path_,conn,db):
                         if str(file_).replace(".csv","") == "extrawords": cur.execute("insert into extrawords (word) VALUES (?)",[row[0]])
                     except:
                         print ("There was a problem with insertion of "+str(file_))
-                
+    
+    try:
+        from bs4 import BeautifulSoup
+        cur.execute('select * from female_names')
+        if not cur.fetchall():
+            for name in get_first_names(path_, gender='female'):
+                cur.execute("insert into female_names (name) VALUES (?)",[name])
+        cur.execute('select * from male_names')
+        if not cur.fetchall():
+            for name in get_first_names(path_, gender='male'):
+                cur.execute("insert into male_names (name) VALUES (?)",[name])
+    except:
+        print ("You need beautifulsoup!") 
     
     conn.commit()
                 

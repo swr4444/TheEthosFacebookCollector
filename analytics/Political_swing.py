@@ -51,55 +51,114 @@ def get_election_results_weight(country_avg):
         
     return weights
 
+def create_dedi_groups(id_list, party):
+    
+    groups = {}
+    
+    zero = {}
+    twen_fiv = {}
+    fifty = {}
+    seve_fiv = {}
+    
+    for k,v in id_list.items():
+        if v[party] > 0.74:
+            seve_fiv[k]=v
+        elif v[party] > 0.59:
+            fifty[k]=v
+        elif v[party] > 0.24:
+            twen_fiv[k]=v
+        elif v[party] > 0.09 and v[party] < 0.25:
+            zero[k]=v
+        else:
+            pass
+    
+    total_ids = float(len(zero) + len(twen_fiv) + len(fifty) + len(seve_fiv))
+    
+    print(str(float((len(zero))/total_ids)*100) + " : " + str(len(zero)))
+    print(str(float((len(twen_fiv))/total_ids)*100) + " : " + str(len(twen_fiv)))
+    print(str(float((len(fifty))/total_ids)*100) + " : " + str(len(fifty)))
+    print(str(float((len(seve_fiv))/total_ids)*100) + " : " + str(len(seve_fiv)))
+    
+    print (total_ids)
+    groups['0']=zero
+    groups['25']=twen_fiv
+    groups['50']=fifty
+    groups['75']=seve_fiv
+    
+    return groups
+
+def collapse_groups(groups):
+    
+    collapsed_group = {'all':{}}
+    for k,v in groups.items():
+        for kk,vv in v.items():
+            collapsed_group['all'][kk]=vv
+        
+    return collapsed_group
+
+def filter_group(groups,filters=[]):
+    
+    new_groups = {}
+    for f in filters:
+        if f in groups:
+            new_groups[f]=groups[f]
+            
+        
+    return new_groups
+
+def create_dedi_collection(id_list,parties=["H","V","KrF","SV","Frp","MDG","A","Sp"],groups=['75','50','25','0']):
+    
+    chosen_ids = {}
+    for party in parties:
+        #Create specific groups of users that corresponds to dedication for a given party
+        dedi_groups = create_dedi_groups(id_list, party)
+        for id_,parties in collapse_groups(filter_group(dedi_groups, filters=groups))['all'].items():
+            chosen_ids[id_]=parties
+
+    return chosen_ids
+    
 def aggregate_likers(liker_list,print_len,normalize,party_,cur,title=""):
     
     rb = {}
+    rb_template = []
+    rb2 = {}
     
     cur.execute('select party from political_entities')
     for row in cur.fetchall():
         rb[str(row[0])]=0.0
+        rb_template.append(row[0])
     
     for p in liker_list:
-        if True:
-        #try:
-            rb['O']+=(p['O']/(len(liker_list)))
-            rb['V']+=(p['V']/(len(liker_list)))
-            rb['C']+=(p['C']/(len(liker_list)))
-            rb['I']+=(p['I']/(len(liker_list)))
-            rb['OE']+=(p['OE']/(len(liker_list)))
-            rb['A']+=(p['A']/(len(liker_list)))
-            rb['B']+=(p['B']/(len(liker_list)))
-            rb['F']+=(p['F']/(len(liker_list)))
-            rb['AA']+=(p['AA']/(len(liker_list)))
-            rb['N']+=(p['N']/(len(liker_list)))
-            rb['Q']+=(p['Q']/(len(liker_list)))
-        #except:
-            #print ("data fail")
+        for party in rb_template:
+            rb[party]+=p[party]
     
+    for k,v in rb.items():
+        rb2[k]=float(float(v)/float(sum(rb.values())))
+        
     if normalize == True:
         
-        party_percent = float(1-rb[party_])
-        del rb[party_]
-        for k,v in rb.items():
-            if rb[k] == 0:
-                rb[k]=0
+        party_percent = float(1-rb2[party_])
+        del rb2[party_]
+        for k,v in rb2.items():
+            if rb2[k] == 0:
+                rb2[k]=0
             else:
-                rb[k]=(rb[k]/party_percent)
+                rb2[k]=(rb2[k]/party_percent)
     
     if print_len == True:
         
         total_per = 0
         #print (rb)
-        for k,v in rb.items():
+        for k,v in rb2.items():
             print (str(k) + "\t" + str(round(v*100,2))+"\t"+title)
             total_per+=v
             #print (len(liker_list))
         print (total_per)
     
-    if '' in rb:
-        del rb['']
+    if '' in rb2:
+        del rb2['']
     
-    return rb
+    return rb2
 
 def election_results_weight(party,percentage):
     
@@ -225,7 +284,7 @@ def get_pol_from_users(userlist,cur,compare=False,election_weights=False,title="
     print ("Number of users in politically significant sample"+"  :  "+str(len(pol_users)))
     
     if election_weights == True:
-        
+                
         if compare == False:
             pol_users = make_election_weights(aggregate_likers(pol_users.values(), False, False, "", cur, title=title),title=title)
             return pol_users
@@ -250,14 +309,17 @@ def get_pol_from_users(userlist,cur,compare=False,election_weights=False,title="
 
 def get_swing(Main_path_,conn_,DB,pages_,title_="",compare_=False,election_weights_=False,print_result=True):
     
-    def print_result(result,title):
+    def print_result(result,title,election_weight=False):
         
         print ("\n")
         print ("OVERALL POLITICAL SWING:")
         print ("\n")
         for k,v in result.items():
-            print (str(k) + "\t" + str(round(v,3)) + "\t" + title)
-        #print (sum(result.values()))
+            if election_weight == True:
+                print (str(k) + "\t" + str(round(v,3)) + "\t" + title)
+            else:
+                print (str(k) + "\t" + str(round(v,3)) + "\t" + title)
+        print (sum(result.values()))
     
     global election_weights
     global pol_ids
@@ -270,10 +332,12 @@ def get_swing(Main_path_,conn_,DB,pages_,title_="",compare_=False,election_weigh
     cur = conn.cursor()
     pol_ids = get_ids_already_parsed(Main_path)
     pol_ids = create_non_empty_ids(pol_ids)
-    election_weights = get_election_results_weight((aggregate_likers(pol_ids.values(), False, False, "", cur)))
+    pol_ids = create_dedi_collection(pol_ids, parties=['A'],groups=['75'])
+    if election_weights_ == True:
+        election_weights = get_election_results_weight((aggregate_likers(pol_ids.values(), False, False, "", cur)))
     result = get_pol_from_users(get_users_from_pages(conn, DB_name,pages_), cur, compare=compare_,election_weights=election_weights_,title=title_)
     
-    print_result(result, title_)
+    print_result(result, title_,election_weight=election_weights_)
     
     
     

@@ -76,6 +76,15 @@ def try_json_float(var_,keys_):
         except:
             return 0.0
         
+def sort_dict_by_key(d1,int_=False):
+    
+    import operator
+    if int_ == True:
+        d1 = sorted(d1.items(), key=operator.itemgetter(int(0)))
+    else:
+        d1 = sorted(d1.items(), key=operator.itemgetter(0))
+    
+    return d1
         
 def create_indeces(conn,title):
     
@@ -801,8 +810,10 @@ def make_CSV_files(db,db_path):
     table_list = ["with_count_post_info","with_count_comment_info","post_info","comment_info","page_info","page_likes_info","comment_likes_info","replies_info","reply_likes_info","reply_tags_info","comment_tags_info","likes_info"]
     chosen_files = []
     chosen_files_joined = []
+    all_tables_joined = []
     temp_table_list = {"1":"with_count_post_info","2":"with_count_comment_info","3":"post_info","4":"comment_info","5":"page_info","6":"page_likes_info","7":"comment_likes_info","8":"replies_info","9":"reply_likes_info","10":"reply_tags_info","11":"comment_tags_info","12":"likes_info"}
     temp_table_joined_list = {"13":"likes_info","14":"comment_info"}
+    temp_all_tables = {"19":"All_tables_joined"}
     
     def write_csvs(title,path,conn,table_list):
         table_info = []
@@ -852,6 +863,8 @@ def make_CSV_files(db,db_path):
                         w.writerow(row)
             except:
                 print ("Can't find table: [{0}]".format(table))
+        
+        
                     
     def choose_files(db,db_path):
             
@@ -867,13 +880,15 @@ def make_CSV_files(db,db_path):
                 print ("joined file: posts and {0}".format(f))
         print ("\n")
         print ("Choose from following tables: ")
-        for k,v in sorted(temp_table_list.items()):
+        for k,v in sort_dict_by_key(temp_table_list,int_=True):
             print (k + " - " + v)
-        for k,v in sorted(temp_table_joined_list.items()):
-            print (k + " - post_info joined with "+ v)   
+        for k,v in sort_dict_by_key(temp_table_joined_list,int_=True):
+            print (k + " - post_info joined with "+ v)
+        for k,v in sort_dict_by_key(temp_table_joined_list,int_=True):
+            print (k + " - " + v + "(This might take a long time for large data collections!)")
         
         answer = get_inp(">>> ") 
-        while check_answer(answer,"13","14","done","0",*temp_table_list.keys()) == False:
+        while check_answer(answer,"13","14","19","done","0",*temp_table_list.keys()) == False:
             answer = get_inp(">>> ")
         
         if answer == "0":
@@ -895,8 +910,17 @@ def make_CSV_files(db,db_path):
                     write_joined_csvs(title, path, conn, chosen_files_joined)
                 except:
                     pass
+                try:
+                    pass
+                except:
+                    pass
             except:
                 print ("No data available...")
+        
+        elif answer == '19':
+            all_tables_joined.append(answer)
+            del temp_all_tables[answer]
+            choose_files(db, db_path)
         
         elif answer in temp_table_joined_list:
             chosen_files_joined.append(temp_table_joined_list[answer])
@@ -1128,7 +1152,7 @@ def make_gephi_files(db,db_path):
         
         clear_screen()
         print ("Choose the network you want to create. Enter 0 to quit.")
-        for k,v in network_choice.items():
+        for k,v in sort_dict_by_key(network_choice):
             print (k + ". " + v)
         print ("9. Make network from date range")
         
